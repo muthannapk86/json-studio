@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Studio — viewer, diff, schema &amp; convert</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --panel: #151b23;
+    --panel-2: #1b2330;
+    --border: #2a3341;
+    --text: #e6edf3;
+    --muted: #7d8b9c;
+    --key: #7ec8ff;
+    --string: #8fe9a8;
+    --number: #f0a868;
+    --bool: #d2a8ff;
+    --null: #6e7681;
+    --accent: #f0a868;
+    --accent-2: #56d4bb;
+    --error: #f85149;
+    --added: #3fb950;
+    --removed: #f85149;
+    --changed: #d29922;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.035) 1px, transparent 0) 0 0/22px 22px,
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 22px 26px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand h1 {
+    font-family: var(--mono);
+    font-size: 19px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .brand h1 span { color: var(--accent); }
+  .brand p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  .privacy-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent-2);
+    border: 1px solid rgba(86, 212, 187, 0.35);
+    background: rgba(86, 212, 187, 0.07);
+    padding: 5px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .privacy-badge::before { content: "● "; }
+
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 26px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  nav.tabs button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 12px 14px;
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+  }
+  nav.tabs button.active { color: var(--text); }
+  nav.tabs button.active::after {
+    content: "";
+    position: absolute;
+    left: 10px; right: 10px; bottom: -1px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 8px rgba(240,168,104,0.6);
+  }
+
+  main { padding: 20px; max-width: 1300px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel h2 {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    font-family: var(--mono);
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 300px;
+    resize: vertical;
+    background: #0a0f16;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .controls { margin-top: 10px; }
+
+  button, .file-btn, select {
+    background: var(--accent);
+    color: #14100a;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 13px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--sans);
+  }
+  button.secondary, select.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  button.ghost {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  button:hover, select:hover { filter: brightness(1.08); }
+  input[type="file"] { display: none; }
+  input[type="text"] {
+    background: #0a0f16;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    flex: 1;
+    min-width: 160px;
+  }
+
+  #error, .error-box { color: var(--error); font-size: 12.5px; margin-top: 8px; min-height: 16px; font-family: var(--mono); }
+  .note { color: var(--muted); font-size: 11.5px; margin-top: 8px; font-family: var(--mono); }
+
+  /* Tree */
+  #tree { font-family: var(--mono); font-size: 12.5px; overflow: auto; flex: 1; min-height: 300px; }
+  .node { margin-left: 18px; }
+  .toggle { cursor: pointer; user-select: none; color: var(--muted); display: inline-block; width: 14px; }
+  .key { color: var(--key); }
+  .string { color: var(--string); }
+  .number { color: var(--number); }
+  .bool { color: var(--bool); }
+  .null { color: var(--null); }
+  .bracket { color: var(--muted); }
+  .count { color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .collapsed > .children { display: none; }
+  .hl { background: rgba(240,168,104,0.3); border-radius: 2px; }
+  .editable { border-bottom: 1px dashed transparent; cursor: text; }
+  .editable:hover { border-bottom-color: var(--muted); }
+  .editable:focus { outline: 1px solid var(--accent); border-radius: 3px; background: rgba(240,168,104,0.08); }
+  .valline:hover .path-copy { opacity: 1; }
+  .path-copy { opacity: 0; margin-left: 6px; font-size: 10.5px; color: var(--accent-2); cursor: pointer; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 16px; border-radius: 8px; font-size: 12.5px; font-family: var(--mono);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+    z-index: 100;
+  }
+  #toast.show { opacity: 1; }
+
+  /* Diff */
+  .diff-line { font-family: var(--mono); font-size: 12.5px; padding: 4px 8px; border-radius: 4px; margin-bottom: 2px; display: flex; gap: 8px; }
+  .diff-added { background: rgba(63,185,80,0.1); color: var(--added); }
+  .diff-removed { background: rgba(248,81,73,0.1); color: var(--removed); }
+  .diff-changed { background: rgba(210,153,34,0.1); color: var(--changed); }
+  .diff-path { color: var(--muted); min-width: 220px; }
+  .diff-icon { width: 14px; }
+
+  /* Graph */
+  #graphWrap { overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: #0a0f16; min-height: 420px; }
+  svg text { font-family: var(--mono); font-size: 11px; fill: var(--text); }
+
+  /* Auth bar */
+  #authBar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #authBar input {
+    background: #0a0f16; border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 7px 10px; font-family: var(--sans); font-size: 12.5px; width: 190px;
+  }
+
+  /* Pro lock overlay */
+  .tab-panel { position: relative; }
+  .pro-lock { display: none; }
+  .tab-panel.locked .tab-content { display: none; }
+  .tab-panel.locked .pro-lock {
+    display: flex; align-items: center; justify-content: center; min-height: 360px;
+  }
+  .pro-lock-box {
+    text-align: center; max-width: 360px; padding: 26px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--panel);
+  }
+  .pro-lock-title { font-family: var(--mono); font-size: 16px; margin-bottom: 8px; color: var(--accent); }
+  .pro-lock-box p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .pro-lock-box button { margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>JSON<span>Studio</span></h1>
+    <p>Tree viewer, diff, schema tools &amp; format conversion</p>
+  </div>
+  <div id="authBar"></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="viewer">Viewer</button>
+  <button class="tab-btn" data-tab="diff">Diff</button>
+  <button class="tab-btn" data-tab="schema">Schema</button>
+  <button class="tab-btn" data-tab="convert">Convert</button>
+  <button class="tab-btn" data-tab="graph">Graph</button>
+</nav>
+
+<main>
+
+  <!-- VIEWER TAB -->
+  <section id="tab-viewer" class="tab-panel active">
+    <div class="grid2">
+      <div class="panel">
+        <h2>Input</h2>
+        <textarea id="input" spellcheck="false" placeholder='{"name":"example","active":true,"tags":["a","b"]}'></textarea>
+        <div class="row controls">
+          <button onclick="renderJSON()">View</button>
+          <label class="file-btn">Upload<input type="file" id="fileInput" accept=".json,application/json"></label>
+          <button class="secondary" onclick="formatInPlace()">Format</button>
+          <button class="secondary" onclick="minifyInPlace()">Minify</button>
+          <button class="secondary" onclick="clearAll()">Clear</button>
+        </div>
+        <div id="error"></div>
+      </div>
+      <div class="panel">
+        <h2>Tree view</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <input type="text" id="searchBox" placeholder="Search keys or values…" oninput="renderJSON()">
+          <button class="secondary" onclick="expandAll()">Expand all</button>
+          <button class="secondary" onclick="collapseAll()">Collapse all</button>
+        </div>
+        <div id="tree"><span style="color:var(--muted)">Nothing to show yet.</span></div>
+        <div class="note" id="perfNote"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIFF TAB -->
+  <section id="tab-diff" class="tab-panel">
+    <div class="tab-content">
+    <div class="grid2">
+      <div class="panel">
+        <h2>Left (original)</h2>
+        <textarea id="diffLeft" spellcheck="false" placeholder="Paste original JSON"></textarea>
+      </div>
+      <div class="panel">
+        <h2>Right (updated)</h2>
+        <textarea id="diffRight" spellcheck="false" placeholder="Paste updated JSON"></textarea>
+      </div>
+    </div>
+    <div class="row controls">
+      <button onclick="runDiff()">Compare</button>
+      <button class="secondary" onclick="document.getElementById('diffLeft').value='';document.getElementById('diffRight').value='';document.getElementById('diffOut').innerHTML='';">Clear</button>
+    </div>
+    <div class="error-box" id="diffError"></div>
+    <div class="panel" style="margin-top:12px;">
+      <h2>Differences</h2>
+      <div id="diffOut"><span style="color:var(--muted)">Run a comparison to see structural differences (added / removed / changed paths).</span></div>
+    </div>
+  </div>
+    <div class="pro-lock">
+      <div class="pro-lock-box">
+        <div class="pro-lock-title">🔒 Pro feature</div>
+        <p>Compare two JSON documents and see structural differences.</p>
+        <p class="note">Unlock Pro to use this tab, plus Diff, Schema, Convert, and Graph.</p>
+        <button onclick="focusAuthInput()">Unlock Pro</button>
+      </div>
+    </div></section>
+
+  <!-- SCHEMA TAB -->
+  <section id="tab-schema" class="tab-panel">
+    <div class="tab-content">
+    <div class="grid2">
+      <div class="panel">
+        <h2>JSON input</h2>
+        <textarea id="schemaInput" spellcheck="false" placeholder='Paste sample JSON to infer a schema / generate types'></textarea>
+        <div class="row controls">
+          <button onclick="inferSchemaAction()">Infer JSON Schema</button>
+          <button class="secondary" onclick="generateTSAction()">Generate TypeScript</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Output</h2>
+        <textarea id="schemaOutput" spellcheck="false" readonly placeholder="Schema / type output appears here"></textarea>
+        <div class="row controls">
+          <button class="secondary" onclick="copyText('schemaOutput')">Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px;">
+      <h2>Validate JSON against a schema</h2>
+      <div class="grid2">
+        <div>
+          <div class="note" style="margin:0 0 6px;">Data (reuses the JSON input above if left empty)</div>
+          <textarea id="validateData" spellcheck="false" style="min-height:160px;"></textarea>
+        </div>
+        <div>
+          <div class="note" style="margin:0 0 6px;">JSON Schema</div>
+          <textarea id="validateSchema" spellcheck="false" style="min-height:160px;" placeholder='{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}'></textarea>
+        </div>
+      </div>
+      <div class="row controls">
+        <button onclick="validateAction()">Validate</button>
+      </div>
+      <div id="validateOut" class="note" style="font-size:12.5px; color: var(--text);"></div>
+    </div>
+  </div>
+    <div class="pro-lock">
+      <div class="pro-lock-box">
+        <div class="pro-lock-title">🔒 Pro feature</div>
+        <p>Infer JSON Schema, generate TypeScript types, and validate data.</p>
+        <p class="note">Unlock Pro to use this tab, plus Diff, Schema, Convert, and Graph.</p>
+        <button onclick="focusAuthInput()">Unlock Pro</button>
+      </div>
+    </div></section>
+
+  <!-- CONVERT TAB -->
+  <section id="tab-convert" class="tab-panel">
+    <div class="tab-content">
+    <div class="grid2">
+      <div class="panel">
+        <h2 id="convertInputLabel">JSON input</h2>
+        <textarea id="convertInput" spellcheck="false" placeholder="Paste JSON to convert"></textarea>
+      </div>
+      <div class="panel">
+        <h2 id="convertOutputLabel">Output</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <select id="convertFormat" onchange="onConvertFormatChange()">
+            <option value="yaml">YAML</option>
+            <option value="csv">CSV</option>
+            <option value="xml">XML</option>
+            <option value="ndjson">NDJSON</option>
+            <option value="toon">TOON</option>
+          </select>
+          <button onclick="runConvert()">Convert</button>
+          <button class="secondary" id="toonSwapBtn" style="display:none;" onclick="toggleToonDirection()">⇄ Reverse (TOON → JSON)</button>
+          <button class="secondary" onclick="copyText('convertOutput')">Copy</button>
+        </div>
+        <textarea id="convertOutput" spellcheck="false" readonly></textarea>
+      </div>
+    </div>
+    <div class="note">CSV works best on a flat array of objects. XML/YAML/NDJSON are one-way (from JSON). TOON is fully bidirectional — use the reverse button to convert TOON back to JSON.</div>
+    <div class="error-box" id="convertError"></div>
+  </div>
+    <div class="pro-lock">
+      <div class="pro-lock-box">
+        <div class="pro-lock-title">🔒 Pro feature</div>
+        <p>Convert JSON to YAML, XML, CSV, or NDJSON.</p>
+        <p class="note">Unlock Pro to use this tab, plus Diff, Schema, Convert, and Graph.</p>
+        <button onclick="focusAuthInput()">Unlock Pro</button>
+      </div>
+    </div></section>
+
+  <!-- GRAPH TAB -->
+  <section id="tab-graph" class="tab-panel">
+    <div class="tab-content">
+    <div class="panel">
+      <h2>JSON input</h2>
+      <textarea id="graphInput" spellcheck="false" style="min-height:140px;" placeholder="Paste JSON to visualize as a node graph"></textarea>
+      <div class="row controls">
+        <button onclick="renderGraph()">Draw graph</button>
+      </div>
+      <div class="error-box" id="graphError"></div>
+    </div>
+    <div class="note" style="margin: 10px 0;">Best for moderately sized JSON — very large payloads will be dense. Scroll to pan.</div>
+    <div id="graphWrap"></div>
+  </div>
+    <div class="pro-lock">
+      <div class="pro-lock-box">
+        <div class="pro-lock-title">🔒 Pro feature</div>
+        <p>Visualize JSON structure as a node graph.</p>
+        <p class="note">Unlock Pro to use this tab, plus Diff, Schema, Convert, and Graph.</p>
+        <button onclick="focusAuthInput()">Unlock Pro</button>
+      </div>
+    </div></section>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+/* ---------- shared utilities ---------- */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove('show'), 1400);
+}
+function copyText(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.value).then(() => showToast('Copied to clipboard'));
+}
+function safeParse(str) {
+  return JSON.parse(str);
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* =========================================================
+   VIEWER TAB
+   ========================================================= */
+const input = document.getElementById('input');
+const tree = document.getElementById('tree');
+const errorBox = document.getElementById('error');
+const searchBox = document.getElementById('searchBox');
+const perfNote = document.getElementById('perfNote');
+let currentData = null;
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { input.value = reader.result; renderJSON(); };
+  reader.readAsText(file);
+});
+
+function clearAll() {
+  input.value = '';
+  currentData = null;
+  tree.innerHTML = '<span style="color:var(--muted)">Nothing to show yet.</span>';
+  errorBox.textContent = '';
+  perfNote.textContent = '';
+}
+function formatInPlace() {
+  try { input.value = JSON.stringify(safeParse(input.value), null, 2); errorBox.textContent = ''; }
+  catch (e) { errorBox.textContent = 'Invalid JSON: ' + e.message; }
+}
+function minifyInPlace() {
+  try { input.value = JSON.stringify(safeParse(input.value)); errorBox.textContent = ''; }
+  catch (e) { errorBox.textContent = 'Invalid JSON: ' + e.message; }
+}
+
+function findMatchPaths(data, query, path = []) {
+  const matches = [];
+  const q = query.toLowerCase();
+  function walk(val, p) {
+    if (val !== null && typeof val === 'object') {
+      const entries = Array.isArray(val) ? val.map((v,i)=>[i,v]) : Object.entries(val);
+      for (const [k, v] of entries) {
+        if (String(k).toLowerCase().includes(q)) matches.push([...p, k]);
+        walk(v, [...p, k]);
+      }
+    } else {
+      if (String(val).toLowerCase().includes(q)) matches.push(p);
+    }
+  }
+  walk(data, path);
+  return matches;
+}
+
+function renderJSON() {
+  errorBox.textContent = '';
+  let data;
+  try { data = safeParse(input.value); }
+  catch (e) {
+    errorBox.textContent = 'Invalid JSON: ' + e.message;
+    tree.innerHTML = '<span style="color:var(--error)">Fix the JSON above to see the tree.</span>';
+    return;
+  }
+  currentData = data;
+  const big = input.value.length > 200000;
+  perfNote.textContent = big ? `Large input (${(input.value.length/1024).toFixed(0)} KB) — deep nodes collapsed by default for performance.` : '';
+
+  const query = searchBox.value.trim();
+  let forceExpandPaths = new Set();
+  if (query) {
+    const matches = findMatchPaths(data, query);
+    matches.forEach(p => {
+      for (let i = 0; i <= p.length; i++) forceExpandPaths.add(JSON.stringify(p.slice(0, i)));
+    });
+  }
+
+  tree.innerHTML = '';
+  tree.appendChild(buildNode(data, null, [], { query, forceExpandPaths, big }));
+}
+
+function highlightText(text, query) {
+  if (!query) return document.createTextNode(text);
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return document.createTextNode(text);
+  const frag = document.createDocumentFragment();
+  frag.appendChild(document.createTextNode(text.slice(0, idx)));
+  const mark = document.createElement('span');
+  mark.className = 'hl';
+  mark.textContent = text.slice(idx, idx + query.length);
+  frag.appendChild(mark);
+  frag.appendChild(document.createTextNode(text.slice(idx + query.length)));
+  return frag;
+}
+
+function pathToString(path) {
+  let s = '$';
+  for (const seg of path) {
+    s += typeof seg === 'number' ? `[${seg}]` : `.${seg}`;
+  }
+  return s;
+}
+
+function setAtPath(root, path, value) {
+  if (path.length === 0) return value;
+  let obj = root;
+  for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+  obj[path[path.length - 1]] = value;
+  return root;
+}
+
+function buildNode(value, key, path, ctx) {
+  const wrapper = document.createElement('div');
+  if (path.length) wrapper.className = 'node';
+  const isObj = value !== null && typeof value === 'object' && !Array.isArray(value);
+  const isArr = Array.isArray(value);
+  const pathKey = JSON.stringify(path);
+
+  if (isObj || isArr) {
+    const entries = isArr ? value.map((v,i)=>[i,v]) : Object.entries(value);
+    const openBracket = isArr ? '[' : '{';
+    const closeBracket = isArr ? ']' : '}';
+
+    const shouldCollapse = ctx.big && path.length >= 2 && !ctx.forceExpandPaths.has(pathKey);
+
+    const header = document.createElement('div');
+    const toggle = document.createElement('span');
+    toggle.className = 'toggle';
+    toggle.textContent = entries.length ? (shouldCollapse ? '▸' : '▾') : ' ';
+    header.appendChild(toggle);
+
+    if (key !== null) {
+      const keySpan = document.createElement('span');
+      keySpan.className = 'key';
+      keySpan.appendChild(highlightText(`"${key}"`, ctx.query));
+      keySpan.append(': ');
+      header.appendChild(keySpan);
+    }
+    const openSpan = document.createElement('span');
+    openSpan.className = 'bracket';
+    openSpan.textContent = openBracket;
+    header.appendChild(openSpan);
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'count';
+    countSpan.textContent = `${entries.length} item${entries.length === 1 ? '' : 's'}`;
+    header.appendChild(countSpan);
+
+    const copyBtn = document.createElement('span');
+    copyBtn.className = 'path-copy';
+    copyBtn.textContent = '⧉ copy path';
+    copyBtn.onclick = (e) => { e.stopPropagation(); navigator.clipboard.writeText(pathToString(path)); showToast('Copied ' + pathToString(path)); };
+    header.classList.add('valline');
+    header.appendChild(copyBtn);
+
+    wrapper.appendChild(header);
+    if (shouldCollapse) wrapper.classList.add('collapsed');
+
+    const childrenWrap = document.createElement('div');
+    childrenWrap.className = 'children';
+    entries.forEach(([k, v]) => childrenWrap.appendChild(buildNode(v, k, [...path, k], ctx)));
+    wrapper.appendChild(childrenWrap);
+
+    const closeSpan = document.createElement('div');
+    closeSpan.className = 'bracket node';
+    closeSpan.textContent = closeBracket;
+    wrapper.appendChild(closeSpan);
+
+    if (entries.length) {
+      toggle.addEventListener('click', () => {
+        wrapper.classList.toggle('collapsed');
+        toggle.textContent = wrapper.classList.contains('collapsed') ? '▸' : '▾';
+      });
+    }
+  } else {
+    const line = document.createElement('div');
+    line.className = 'valline';
+    if (key !== null) {
+      const keySpan = document.createElement('span');
+      keySpan.className = 'key';
+      keySpan.appendChild(highlightText(`"${key}"`, ctx.query));
+      keySpan.append(': ');
+      line.appendChild(keySpan);
+    }
+    const valSpan = document.createElement('span');
+    valSpan.className = 'editable';
+    valSpan.contentEditable = 'true';
+    valSpan.spellcheck = false;
+
+    let displayText, cls;
+    if (typeof value === 'string') { cls = 'string'; displayText = `"${value}"`; }
+    else if (typeof value === 'number') { cls = 'number'; displayText = String(value); }
+    else if (typeof value === 'boolean') { cls = 'bool'; displayText = String(value); }
+    else { cls = 'null'; displayText = 'null'; }
+    valSpan.className += ' ' + cls;
+    valSpan.appendChild(highlightText(displayText, ctx.query));
+
+    valSpan.addEventListener('blur', () => {
+      let raw = valSpan.textContent.trim();
+      let parsed;
+      try {
+        if (raw === 'null') parsed = null;
+        else if (raw === 'true' || raw === 'false') parsed = raw === 'true';
+        else if (!isNaN(raw) && raw !== '') parsed = Number(raw);
+        else if (raw.startsWith('"') && raw.endsWith('"')) parsed = JSON.parse(raw);
+        else parsed = raw; // treat bare text as string
+        setAtPath(currentData, path, parsed);
+        input.value = JSON.stringify(currentData, null, 2);
+        showToast('Updated ' + pathToString(path));
+      } catch (e) { showToast('Could not parse edit'); }
+    });
+
+    const copyBtn = document.createElement('span');
+    copyBtn.className = 'path-copy';
+    copyBtn.textContent = '⧉';
+    copyBtn.onclick = () => { navigator.clipboard.writeText(pathToString(path)); showToast('Copied ' + pathToString(path)); };
+
+    line.appendChild(valSpan);
+    line.appendChild(copyBtn);
+    wrapper.appendChild(line);
+  }
+  return wrapper;
+}
+
+function expandAll() { tree.querySelectorAll('.collapsed').forEach(n => { n.classList.remove('collapsed'); const t = n.querySelector(':scope > div .toggle'); if (t) t.textContent = '▾'; }); }
+function collapseAll() { tree.querySelectorAll('.node, #tree > div').forEach(n => { if (n.querySelector(':scope > .children')) { n.classList.add('collapsed'); const t = n.querySelector(':scope > div .toggle'); if (t) t.textContent = '▸'; } }); }
+
+input.value = JSON.stringify({
+  name: "JSON Studio", version: 1, active: true,
+  tags: ["json","viewer","diff","schema"],
+  author: { name: "You", contact: null }
+}, null, 2);
+renderJSON();
+
+/* =========================================================
+   DIFF TAB
+   ========================================================= */
+function diffValues(a, b, path, out) {
+  const aIsObj = a !== null && typeof a === 'object';
+  const bIsObj = b !== null && typeof b === 'object';
+
+  if (!aIsObj && !bIsObj) {
+    if (a !== b) out.push({ type: 'changed', path, a, b });
+    return;
+  }
+  if (aIsObj !== bIsObj) { out.push({ type: 'changed', path, a, b }); return; }
+
+  const aArr = Array.isArray(a), bArr = Array.isArray(b);
+  if (aArr !== bArr) { out.push({ type: 'changed', path, a, b }); return; }
+
+  const aKeys = aArr ? a.map((_,i)=>i) : Object.keys(a);
+  const bKeys = bArr ? b.map((_,i)=>i) : Object.keys(b);
+  const allKeys = new Set([...aKeys, ...bKeys]);
+
+  for (const k of allKeys) {
+    const has_a = aArr ? k < a.length : Object.prototype.hasOwnProperty.call(a, k);
+    const has_b = bArr ? k < b.length : Object.prototype.hasOwnProperty.call(b, k);
+    const p = [...path, k];
+    if (has_a && !has_b) out.push({ type: 'removed', path: p, a: a[k] });
+    else if (!has_a && has_b) out.push({ type: 'added', path: p, b: b[k] });
+    else diffValues(a[k], b[k], p, out);
+  }
+}
+
+function runDiff() {
+  const diffError = document.getElementById('diffError');
+  const diffOut = document.getElementById('diffOut');
+  diffError.textContent = '';
+  let left, right;
+  try { left = safeParse(document.getElementById('diffLeft').value); }
+  catch (e) { diffError.textContent = 'Left JSON invalid: ' + e.message; return; }
+  try { right = safeParse(document.getElementById('diffRight').value); }
+  catch (e) { diffError.textContent = 'Right JSON invalid: ' + e.message; return; }
+
+  const results = [];
+  diffValues(left, right, [], results);
+
+  if (!results.length) { diffOut.innerHTML = '<span style="color:var(--added)">No differences found — the two JSON documents are structurally identical.</span>'; return; }
+
+  diffOut.innerHTML = '';
+  results.forEach(r => {
+    const line = document.createElement('div');
+    line.className = 'diff-line diff-' + r.type;
+    const icon = document.createElement('span');
+    icon.className = 'diff-icon';
+    icon.textContent = r.type === 'added' ? '+' : r.type === 'removed' ? '-' : '~';
+    const pathSpan = document.createElement('span');
+    pathSpan.className = 'diff-path';
+    pathSpan.textContent = pathToString(r.path);
+    const valSpan = document.createElement('span');
+    if (r.type === 'added') valSpan.textContent = 'added: ' + JSON.stringify(r.b);
+    else if (r.type === 'removed') valSpan.textContent = 'removed: ' + JSON.stringify(r.a);
+    else valSpan.textContent = JSON.stringify(r.a) + '  →  ' + JSON.stringify(r.b);
+    line.append(icon, pathSpan, valSpan);
+    diffOut.appendChild(line);
+  });
+}
+
+/* =========================================================
+   SCHEMA TAB
+   ========================================================= */
+function inferSchema(value) {
+  if (value === null) return { type: 'null' };
+  if (Array.isArray(value)) {
+    return { type: 'array', items: value.length ? inferSchema(value[0]) : {} };
+  }
+  if (typeof value === 'object') {
+    const properties = {};
+    const required = [];
+    for (const [k, v] of Object.entries(value)) {
+      properties[k] = inferSchema(v);
+      required.push(k);
+    }
+    return { type: 'object', properties, required };
+  }
+  if (typeof value === 'string') return { type: 'string' };
+  if (typeof value === 'number') return { type: Number.isInteger(value) ? 'integer' : 'number' };
+  if (typeof value === 'boolean') return { type: 'boolean' };
+  return {};
+}
+
+function inferSchemaAction() {
+  try {
+    const data = safeParse(document.getElementById('schemaInput').value);
+    const schema = inferSchema(data);
+    document.getElementById('schemaOutput').value = JSON.stringify(schema, null, 2);
+  } catch (e) {
+    document.getElementById('schemaOutput').value = 'Error: ' + e.message;
+  }
+}
+
+function toPascalCase(str) {
+  return String(str).replace(/(^\w|[-_]\w)/g, m => m.replace(/[-_]/, '').toUpperCase());
+}
+
+function generateTS(value, name, out) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) {
+    if (!value.length) return 'any[]';
+    return generateTS(value[0], name, out) + '[]';
+  }
+  if (typeof value === 'object') {
+    const typeName = toPascalCase(name || 'Root');
+    const lines = [`interface ${typeName} {`];
+    for (const [k, v] of Object.entries(value)) {
+      const safeKey = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k) ? k : `"${k}"`;
+      lines.push(`  ${safeKey}: ${generateTS(v, k, out)};`);
+    }
+    lines.push('}');
+    out.push(lines.join('\n'));
+    return typeName;
+  }
+  if (typeof value === 'string') return 'string';
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'boolean') return 'boolean';
+  return 'any';
+}
+
+function generateTSAction() {
+  try {
+    const data = safeParse(document.getElementById('schemaInput').value);
+    const interfaces = [];
+    generateTS(data, 'Root', interfaces);
+    document.getElementById('schemaOutput').value = interfaces.reverse().join('\n\n');
+  } catch (e) {
+    document.getElementById('schemaOutput').value = 'Error: ' + e.message;
+  }
+}
+
+function validateAgainstSchema(schema, data, path, errors) {
+  if (!schema || typeof schema !== 'object') return;
+  const type = schema.type;
+  const actualType = data === null ? 'null' : Array.isArray(data) ? 'array' : typeof data;
+  const normalizedType = actualType === 'number' && Number.isInteger(data) ? ['number','integer'] : [actualType];
+
+  if (type && !normalizedType.includes(type) && !(type === 'number' && actualType === 'number')) {
+    errors.push(`${path || '$'}: expected type "${type}" but got "${actualType}"`);
+    return;
+  }
+  if (schema.enum && !schema.enum.includes(data)) {
+    errors.push(`${path || '$'}: value not in enum [${schema.enum.join(', ')}]`);
+  }
+  if (type === 'object' && data && typeof data === 'object') {
+    for (const req of schema.required || []) {
+      if (!(req in data)) errors.push(`${path || '$'}: missing required property "${req}"`);
+    }
+    for (const [k, subSchema] of Object.entries(schema.properties || {})) {
+      if (k in data) validateAgainstSchema(subSchema, data[k], (path ? path + '.' : '$.') + k, errors);
+    }
+  }
+  if (type === 'array' && Array.isArray(data) && schema.items) {
+    data.forEach((item, i) => validateAgainstSchema(schema.items, item, `${path || '$'}[${i}]`, errors));
+  }
+}
+
+function validateAction() {
+  const out = document.getElementById('validateOut');
+  const rawData = document.getElementById('validateData').value.trim() || document.getElementById('schemaInput').value;
+  let data, schema;
+  try { data = safeParse(rawData); } catch (e) { out.innerHTML = `<span style="color:var(--error)">Data invalid: ${e.message}</span>`; return; }
+  try { schema = safeParse(document.getElementById('validateSchema').value); } catch (e) { out.innerHTML = `<span style="color:var(--error)">Schema invalid: ${e.message}</span>`; return; }
+
+  const errors = [];
+  validateAgainstSchema(schema, data, '', errors);
+  if (!errors.length) out.innerHTML = '<span style="color:var(--added)">✓ Valid — data matches the schema.</span>';
+  else out.innerHTML = errors.map(e => `<div style="color:var(--error)">✗ ${e}</div>`).join('');
+}
+
+/* =========================================================
+   CONVERT TAB
+   ========================================================= */
+function toYAML(value, indent = 0) {
+  const pad = '  '.repeat(indent);
+  if (value === null) return 'null';
+  if (Array.isArray(value)) {
+    if (!value.length) return '[]';
+    return value.map(v => {
+      if (v !== null && typeof v === 'object') {
+        const inner = toYAML(v, indent + 1);
+        return `${pad}- ${inner.trimStart().replace(new RegExp('\\n' + '  '.repeat(indent+1), 'g'), '\n' + '  '.repeat(indent+1))}`.replace(`${pad}- ${'  '.repeat(indent+1)}`, `${pad}- `);
+      }
+      return `${pad}- ${scalarYAML(v)}`;
+    }).join('\n');
+  }
+  if (typeof value === 'object') {
+    const keys = Object.keys(value);
+    if (!keys.length) return '{}';
+    return keys.map(k => {
+      const v = value[k];
+      if (v !== null && typeof v === 'object') {
+        return `${pad}${k}:\n${toYAML(v, indent + 1)}`;
+      }
+      return `${pad}${k}: ${scalarYAML(v)}`;
+    }).join('\n');
+  }
+  return pad + scalarYAML(value);
+}
+function scalarYAML(v) {
+  if (typeof v === 'string') return /[:#\-\[\]{}"']/.test(v) || v === '' ? JSON.stringify(v) : v;
+  return String(v);
+}
+
+function toXML(value, tagName = 'root') {
+  function build(val, name) {
+    if (val === null) return `<${name}/>`;
+    if (Array.isArray(val)) return val.map(v => build(v, name.replace(/s$/, '') || 'item')).join('');
+    if (typeof val === 'object') {
+      const inner = Object.entries(val).map(([k, v]) => build(v, k)).join('');
+      return `<${name}>${inner}</${name}>`;
+    }
+    const escaped = String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<${name}>${escaped}</${name}>`;
+  }
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + build(value, tagName);
+}
+
+function toCSV(value) {
+  if (!Array.isArray(value)) throw new Error('CSV conversion requires a top-level JSON array of objects.');
+  const rows = value.map(flatten);
+  const headers = [...new Set(rows.flatMap(r => Object.keys(r)))];
+  const escape = (v) => {
+    if (v === undefined || v === null) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [headers.join(',')];
+  rows.forEach(r => lines.push(headers.map(h => escape(r[h])).join(',')));
+  return lines.join('\n');
+}
+function flatten(obj, prefix = '', out = {}) {
+  if (obj !== null && typeof obj === 'object' && !Array.isArray(obj)) {
+    for (const [k, v] of Object.entries(obj)) flatten(v, prefix ? `${prefix}.${k}` : k, out);
+  } else if (Array.isArray(obj)) {
+    out[prefix] = JSON.stringify(obj);
+  } else {
+    out[prefix] = obj;
+  }
+  return out;
+}
+
+function toNDJSON(value) {
+  if (!Array.isArray(value)) throw new Error('NDJSON conversion requires a top-level JSON array.');
+  return value.map(v => JSON.stringify(v)).join('\n');
+}
+
+/* ---- TOON (Token-Oriented Object Notation) — bidirectional ---- */
+
+function toonNeedsQuoting(str) {
+  if (str === '') return true;
+  if (/[:,\n#\[\]{}]/.test(str)) return true;
+  if (/^\s|\s$/.test(str)) return true;
+  if (['true', 'false', 'null'].includes(str)) return true;
+  if (!isNaN(str) && str.trim() !== '') return true;
+  return false;
+}
+function toonEncodeScalar(v) {
+  if (v === null || v === undefined) return 'null';
+  if (typeof v === 'boolean' || typeof v === 'number') return String(v);
+  if (typeof v === 'string') return toonNeedsQuoting(v) ? JSON.stringify(v) : v;
+  return JSON.stringify(v);
+}
+function toonIsUniformObjectArray(arr) {
+  if (!arr.length) return false;
+  if (!arr.every(item => item !== null && typeof item === 'object' && !Array.isArray(item))) return false;
+  const firstKeys = Object.keys(arr[0]);
+  return arr.every(item => {
+    const keys = Object.keys(item);
+    if (keys.length !== firstKeys.length) return false;
+    return firstKeys.every(k => Object.prototype.hasOwnProperty.call(item, k) && (item[k] === null || typeof item[k] !== 'object'));
+  });
+}
+function toonIsPrimitiveArray(arr) {
+  return arr.every(v => v === null || typeof v !== 'object');
+}
+function toonEncodeObjectFields(obj, indent, lines) {
+  for (const [k, v] of Object.entries(obj)) toonEncodeEntry(v, k, indent, lines);
+}
+function toonEncodeEntry(value, keyName, indent, lines) {
+  const pad = '  '.repeat(indent);
+  if (Array.isArray(value)) {
+    if (!value.length) { lines.push(`${pad}${keyName}[0]:`); return; }
+    if (toonIsUniformObjectArray(value)) {
+      const fields = Object.keys(value[0]);
+      lines.push(`${pad}${keyName}[${value.length}]{${fields.join(',')}}:`);
+      value.forEach(obj => lines.push(`${pad}  ${fields.map(f => toonEncodeScalar(obj[f])).join(',')}`));
+    } else if (toonIsPrimitiveArray(value)) {
+      lines.push(`${pad}${keyName}[${value.length}]: ${value.map(toonEncodeScalar).join(',')}`);
+    } else {
+      lines.push(`${pad}${keyName}[${value.length}]:`);
+      value.forEach(item => {
+        if (item !== null && typeof item === 'object' && !Array.isArray(item)) {
+          lines.push(`${pad}  -`);
+          toonEncodeObjectFields(item, indent + 2, lines);
+        } else {
+          lines.push(`${pad}  - ${toonEncodeScalar(item)}`);
+        }
+      });
+    }
+  } else if (value !== null && typeof value === 'object') {
+    lines.push(`${pad}${keyName}:`);
+    toonEncodeObjectFields(value, indent + 1, lines);
+  } else {
+    lines.push(`${pad}${keyName}: ${toonEncodeScalar(value)}`);
+  }
+}
+function jsonToTOON(data) {
+  const lines = [];
+  if (Array.isArray(data)) {
+    if (toonIsUniformObjectArray(data)) {
+      const fields = Object.keys(data[0]);
+      lines.push(`[${data.length}]{${fields.join(',')}}:`);
+      data.forEach(obj => lines.push(`  ${fields.map(f => toonEncodeScalar(obj[f])).join(',')}`));
+    } else if (toonIsPrimitiveArray(data)) {
+      lines.push(`[${data.length}]: ${data.map(toonEncodeScalar).join(',')}`);
+    } else {
+      lines.push(`[${data.length}]:`);
+      data.forEach(item => {
+        if (item !== null && typeof item === 'object' && !Array.isArray(item)) {
+          lines.push(`  -`);
+          toonEncodeObjectFields(item, 2, lines);
+        } else {
+          lines.push(`  - ${toonEncodeScalar(item)}`);
+        }
+      });
+    }
+  } else if (data !== null && typeof data === 'object') {
+    toonEncodeObjectFields(data, 0, lines);
+  } else {
+    lines.push(toonEncodeScalar(data));
+  }
+  return lines.join('\n');
+}
+
+function toonSplitRow(str) {
+  const result = [];
+  let cur = '', inQuotes = false;
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (c === '"') { inQuotes = !inQuotes; cur += c; }
+    else if (c === ',' && !inQuotes) { result.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  result.push(cur.trim());
+  return result;
+}
+function toonParseScalar(raw) {
+  const s = raw.trim();
+  if (s === 'null' || s === '') return null;
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  if (s.startsWith('"') && s.endsWith('"')) { try { return JSON.parse(s); } catch (e) { return s.slice(1, -1); } }
+  if (!isNaN(s)) return Number(s);
+  return s;
+}
+function toonToJSON(text) {
+  const rawLines = text.split('\n');
+  const lines = [];
+  rawLines.forEach(line => {
+    const noComment = line.replace(/(^|[^\\])#.*$/, '$1');
+    if (noComment.trim() === '') return;
+    const indent = Math.floor((noComment.match(/^ */)[0].length) / 2);
+    lines.push({ indent, content: noComment.trim() });
+  });
+  if (!lines.length) return {};
+  let pos = 0;
+
+  function parseValue(indent) {
+    if (pos >= lines.length) return null;
+    if (lines[pos].content === '-' || lines[pos].content.startsWith('- ')) return parseList(indent);
+    return parseObject(indent);
+  }
+  function parseList(indent) {
+    const arr = [];
+    while (pos < lines.length && lines[pos].indent === indent && (lines[pos].content === '-' || lines[pos].content.startsWith('- '))) {
+      const content = lines[pos].content === '-' ? '' : lines[pos].content.slice(2);
+      pos++;
+      if (content === '') {
+        arr.push(pos < lines.length && lines[pos].indent === indent + 1 ? parseObject(indent + 1) : null);
+      } else {
+        arr.push(toonParseScalar(content));
+      }
+    }
+    return arr;
+  }
+  function parseObject(indent) {
+    const obj = {};
+    while (pos < lines.length && lines[pos].indent === indent) {
+      const content = lines[pos].content;
+      let m = content.match(/^([^\[:]+)\[(\d+)\]\{([^}]*)\}:\s*$/);
+      if (m) {
+        const key = m[1].trim(), count = parseInt(m[2], 10), fields = m[3].split(',').map(s => s.trim());
+        pos++;
+        const rows = [];
+        for (let i = 0; i < count && pos < lines.length; i++) {
+          const vals = toonSplitRow(lines[pos].content);
+          const rowObj = {};
+          fields.forEach((f, idx) => { rowObj[f] = toonParseScalar(vals[idx] !== undefined ? vals[idx] : ''); });
+          rows.push(rowObj);
+          pos++;
+        }
+        obj[key] = rows;
+        continue;
+      }
+      m = content.match(/^([^\[:]+)\[(\d+)\]:\s*(.*)$/);
+      if (m) {
+        const key = m[1].trim(), rest = m[3];
+        pos++;
+        if (rest.trim() !== '') obj[key] = toonSplitRow(rest).map(toonParseScalar);
+        else obj[key] = (pos < lines.length && lines[pos].indent === indent + 1) ? parseList(indent + 1) : [];
+        continue;
+      }
+      m = content.match(/^([^:]+):\s*(.*)$/);
+      if (m) {
+        const key = m[1].trim(), rest = m[2];
+        pos++;
+        if (rest.trim() === '') {
+          obj[key] = (pos < lines.length && lines[pos].indent > indent) ? parseValue(lines[pos].indent) : null;
+        } else {
+          obj[key] = toonParseScalar(rest);
+        }
+        continue;
+      }
+      pos++; // unrecognized line, skip defensively
+    }
+    return obj;
+  }
+
+  return parseValue(lines[0].indent);
+}
+
+/* ---- Convert tab controller ---- */
+let toonReversed = false;
+function onConvertFormatChange() { updateConvertUI(); runConvert(); }
+function toggleToonDirection() { toonReversed = !toonReversed; updateConvertUI(); runConvert(); }
+function updateConvertUI() {
+  const fmt = document.getElementById('convertFormat').value;
+  const swapBtn = document.getElementById('toonSwapBtn');
+  const inLabel = document.getElementById('convertInputLabel');
+  const outLabel = document.getElementById('convertOutputLabel');
+  swapBtn.style.display = fmt === 'toon' ? 'inline-block' : 'none';
+  if (fmt !== 'toon') toonReversed = false;
+  if (fmt === 'toon' && toonReversed) {
+    inLabel.textContent = 'TOON input';
+    outLabel.textContent = 'JSON output';
+    swapBtn.textContent = '⇄ Reverse (JSON → TOON)';
+  } else {
+    inLabel.textContent = 'JSON input';
+    outLabel.textContent = 'Output';
+    swapBtn.textContent = '⇄ Reverse (TOON → JSON)';
+  }
+}
+
+function runConvert() {
+  const errBox = document.getElementById('convertError');
+  const outBox = document.getElementById('convertOutput');
+  errBox.textContent = '';
+  const fmt = document.getElementById('convertFormat').value;
+
+  if (fmt === 'toon' && toonReversed) {
+    try { outBox.value = JSON.stringify(toonToJSON(document.getElementById('convertInput').value), null, 2); }
+    catch (e) { errBox.textContent = 'Could not parse TOON: ' + e.message; outBox.value = ''; }
+    return;
+  }
+
+  let data;
+  try { data = safeParse(document.getElementById('convertInput').value); }
+  catch (e) { errBox.textContent = 'Invalid JSON: ' + e.message; return; }
+
+  try {
+    if (fmt === 'yaml') outBox.value = toYAML(data);
+    else if (fmt === 'xml') outBox.value = toXML(data);
+    else if (fmt === 'csv') outBox.value = toCSV(data);
+    else if (fmt === 'ndjson') outBox.value = toNDJSON(data);
+    else if (fmt === 'toon') outBox.value = jsonToTOON(data);
+  } catch (e) {
+    errBox.textContent = e.message;
+    outBox.value = '';
+  }
+}
+
+/* =========================================================
+   GRAPH TAB
+   ========================================================= */
+function renderGraph() {
+  const errBox = document.getElementById('graphError');
+  const wrap = document.getElementById('graphWrap');
+  errBox.textContent = '';
+  let data;
+  try { data = safeParse(document.getElementById('graphInput').value); }
+  catch (e) { errBox.textContent = 'Invalid JSON: ' + e.message; return; }
+
+  const nodes = [];
+  const links = [];
+  let idCounter = 0;
+
+  function walk(value, label, depth, parentId) {
+    const id = idCounter++;
+    let text = label;
+    let leaf = false;
+    if (value === null || typeof value !== 'object') {
+      text = `${label}: ${typeof value === 'string' ? '"' + value + '"' : value}`;
+      leaf = true;
+    }
+    nodes.push({ id, text, depth, leaf });
+    if (parentId !== null) links.push({ source: parentId, target: id });
+    if (value !== null && typeof value === 'object') {
+      const entries = Array.isArray(value) ? value.map((v,i)=>[`[${i}]`, v]) : Object.entries(value);
+      entries.forEach(([k, v]) => walk(v, String(k), depth + 1, id));
+    }
+  }
+  walk(data, 'root', 0, null);
+
+  const depthGroups = {};
+  nodes.forEach(n => { (depthGroups[n.depth] = depthGroups[n.depth] || []).push(n); });
+  const xGap = 190, yGap = 46;
+  const maxCount = Math.max(...Object.values(depthGroups).map(g => g.length));
+  const width = (Object.keys(depthGroups).length) * xGap + 120;
+  const height = maxCount * yGap + 80;
+
+  Object.entries(depthGroups).forEach(([depth, group]) => {
+    group.forEach((n, i) => {
+      n.x = 60 + Number(depth) * xGap;
+      n.y = 50 + i * (height / group.length) + (height / group.length) / 2 - 15;
+    });
+  });
+
+  let svg = `<svg width="${width}" height="${Math.max(height, 420)}" viewBox="0 0 ${width} ${Math.max(height,420)}">`;
+  links.forEach(l => {
+    const s = nodes[l.source], t = nodes[l.target];
+    svg += `<path d="M ${s.x+60} ${s.y+10} C ${s.x+120} ${s.y+10}, ${t.x-60} ${t.y+10}, ${t.x} ${t.y+10}" fill="none" stroke="#2a3341" stroke-width="1.5"/>`;
+  });
+  nodes.forEach(n => {
+    const fill = n.leaf ? '#151b23' : '#1b2330';
+    const stroke = n.leaf ? '#56d4bb' : '#f0a868';
+    const txt = n.text.length > 24 ? n.text.slice(0, 22) + '…' : n.text;
+    svg += `<rect x="${n.x}" y="${n.y}" width="120" height="24" rx="5" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+    svg += `<text x="${n.x+8}" y="${n.y+16}">${txt.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>`;
+  });
+  svg += '</svg>';
+  wrap.innerHTML = svg;
+}
+
+/* =========================================================
+   AUTH / PRO SUBSCRIPTION (Stripe)
+   ========================================================= */
+const PAID_TABS = ['diff', 'schema', 'convert', 'graph'];
+let proActive = false;
+
+function getSavedEmail() { return localStorage.getItem('jsonstudio_email') || ''; }
+function saveEmail(e) { localStorage.setItem('jsonstudio_email', e); }
+
+function renderAuthBar(email, active) {
+  const bar = document.getElementById('authBar');
+  if (active) {
+    bar.innerHTML = `
+      <span class="privacy-badge" style="border-color: rgba(63,185,80,0.4); color: var(--added);">✓ Pro unlocked — ${email}</span>
+      <button class="ghost" onclick="signOut()">Sign out</button>`;
+  } else {
+    bar.innerHTML = `
+      <input type="email" id="authEmail" placeholder="you@email.com" value="${email || ''}">
+      <button onclick="startCheckout()">Unlock Pro — $9/mo</button>
+      <span class="privacy-badge">100% client-side viewer</span>`;
+  }
+}
+
+function setLocked(locked) {
+  PAID_TABS.forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('locked', locked);
+  });
+}
+
+function focusAuthInput() {
+  document.querySelectorAll('.tab-btn')[0].click(); // jump to Viewer where the bar is visible
+  const el = document.getElementById('authEmail');
+  if (el) el.focus();
+}
+
+async function checkAccess() {
+  const email = getSavedEmail();
+  if (!email) { proActive = false; setLocked(true); renderAuthBar('', false); return; }
+  try {
+    const res = await fetch(`/api/subscription-status?email=${encodeURIComponent(email)}`);
+    const data = await res.json();
+    proActive = !!data.active;
+  } catch (e) {
+    proActive = false;
+  }
+  setLocked(!proActive);
+  renderAuthBar(email, proActive);
+}
+
+async function startCheckout() {
+  const emailInput = document.getElementById('authEmail');
+  const email = emailInput.value.trim();
+  if (!email || !email.includes('@')) { showToast('Enter a valid email first'); return; }
+  saveEmail(email);
+  try {
+    const res = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+    else showToast(data.error || 'Could not start checkout');
+  } catch (e) {
+    showToast('Checkout error — check server logs');
+  }
+}
+
+function signOut() {
+  localStorage.removeItem('jsonstudio_email');
+  proActive = false;
+  checkAccess();
+}
+
+checkAccess();
+if (location.search.includes('checkout=success')) {
+  showToast('Payment received — unlocking Pro…');
+  setTimeout(checkAccess, 1200);
+}
+</script>
+</body>
+</html>

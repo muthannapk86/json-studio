@@ -1,0 +1,17 @@
+{
+  "name": "json-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JSON Studio — viewer, diff, schema tools, and conversion, with a Pro subscription via Lemon Squeezy.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
