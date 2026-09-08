@@ -135,7 +135,7 @@ app.get('/api/subscription-status', async (req, res) => {
   try {
     const url =
       `${LS_BASE}/subscriptions?filter[user_email]=` +
-      `${encodeURIComponent(email)}&filter[status]=active`;
+      encodeURIComponent(email);
 
     const response = await fetch(url, { headers: LS_HEADERS });
     const data = await response.json();
@@ -147,9 +147,19 @@ app.get('/api/subscription-status', async (req, res) => {
       });
     }
 
-    res.json({
-      active: Array.isArray(data.data) && data.data.length > 0
-    });
+    const allowedStatuses = new Set(['active', 'on_trial']);
+
+    const active = Array.isArray(data.data) &&
+      data.data.some((subscription) => {
+        const attributes = subscription.attributes;
+
+        return (
+          String(attributes.variant_id) === String(LS_VARIANT_ID) &&
+          allowedStatuses.has(attributes.status)
+        );
+      });
+
+    res.json({ active });
   } catch (error) {
     console.error('Subscription status error:', error.message);
     res.status(500).json({
