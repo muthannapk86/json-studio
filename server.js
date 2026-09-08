@@ -5,7 +5,11 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
+const APP_URL = process.env.APP_URL || (
+  process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `http://localhost:${PORT}`
+);
 
 const LS_API_KEY = process.env.LEMONSQUEEZY_API_KEY;
 const LS_STORE_ID = process.env.LEMONSQUEEZY_STORE_ID;
